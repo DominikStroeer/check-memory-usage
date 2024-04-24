@@ -41,6 +41,14 @@ var (
 			Usage:     "Warning threshold for overall memory usage",
 			Value:     &plugin.Warning,
 		},
+		{
+			Path:      "sample-interval",
+			Argument:  "sample-interval",
+			Shorthand: "s",
+			Default:   2,
+			Usage:     "Length of sample interval in seconds",
+			Value:     &plugin.Interval,
+		},
 	}
 )
 
@@ -59,25 +67,51 @@ func checkArgs(event *types.Event) (int, error) {
 	if plugin.Warning > plugin.Critical {
 		return sensu.CheckStateWarning, fmt.Errorf("--warning cannot be greater than --critical")
 	}
+	if plugin.Interval == 0 {
+		return sensu.CheckStateWarning, fmt.Errorf("--interval is required")
+	}
 	return sensu.CheckStateOK, nil
 }
 
 func executeCheck(event *types.Event) (int, error) {
-	vmStat, err := mem.VirtualMemory()
+	//vmStat, err := mem.VirtualMemory()
+	vmStart, err := mem.VirtualMemory() 
+	duration, err := time.ParseDuration(fmt.Sprintf("%ds", plugin.Interval))
+
 	if err != nil {
 		return sensu.CheckStateCritical, fmt.Errorf("failed to get virtual memory statistics: %v", err)
 	}
+	startTotal := vmStart.UsedPercent
+	time.Sleep(duration)
 
-	perfData := fmt.Sprintf("mem_total=%d, mem_available=%d, mem_used=%d, mem_free=%d", vmStat.Total, vmStat.Available, vmStat.Used, vmStat.Free)
-	if vmStat.UsedPercent > plugin.Critical {
-		fmt.Printf("%s Critical: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, vmStat.UsedPercent, perfData)
+	vmEnd, err := mem.VirtualMemory()
+	endTotal := End.UsedPercent
+
+	perfData := fmt.Sprintf("mem_total=%d, mem_available=%d, mem_used=%d, mem_free=%d", vmStart.Total, vmStart.Available, vmStart.Used, vmStart.Free)
+	if (startTotal > plugin.Critical) and (endTotal > plugin.Critical) {
+		fmt.Printf("%s Critical: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, vmStart.UsedPercent, perfData)
 
 		return sensu.CheckStateCritical, nil
-	} else if vmStat.UsedPercent > plugin.Warning {
-		fmt.Printf("%s Warning: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, vmStat.UsedPercent, perfData)
+	} else if (startTotal > plugin.Warning) and (endTotal > plugin.Warning) {
+		fmt.Printf("%s Warning: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, vmStart.UsedPercent, perfData)
 		return sensu.CheckStateWarning, nil
 	}
 
-	fmt.Printf("%s OK: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, vmStat.UsedPercent, perfData)
+
+
+
+
+
+	//perfData := fmt.Sprintf("mem_total=%d, mem_available=%d, mem_used=%d, mem_free=%d", vmStat.Total, vmStat.Available, vmStat.Used, vmStat.Free)
+	//if vmStat.UsedPercent > plugin.Critical {
+	//	fmt.Printf("%s Critical: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, vmStat.UsedPercent, perfData)
+
+	//	return sensu.CheckStateCritical, nil
+	//} else if vmStat.UsedPercent > plugin.Warning {
+	//	fmt.Printf("%s Warning: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, vmStat.UsedPercent, perfData)
+	//	return sensu.CheckStateWarning, nil
+	//}
+
+	fmt.Printf("%s OK: %.2f%% memory usage | %s\n", plugin.PluginConfig.Name, Start.UsedPercent, perfData)
 	return sensu.CheckStateOK, nil
 }
